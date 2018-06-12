@@ -1,0 +1,6 @@
+XXX is 1
+Scr Out put is 
+runstatus is F
+entering send_email
+SCRIPT2 is not found
+Beg Date->200806111450,Run Date->200806111450,Freq->2M,Env->CR89DEV,CR89DEV,SN->DBDN,EmailAdd->rajesh.arora@blueshieldca.com,Email Subject->DB might be Down,Email Body->DB might be Down,Script->select count(*) from tab,Output type->N,Condition->Succ,Compare value->,Hostname->edhc01psftdb01.bscdev.bscal.com,Port->1521,rarora01,OutPut->NOERROR,Status(S-Success/F-Fail)->F,Email Sent for event->N

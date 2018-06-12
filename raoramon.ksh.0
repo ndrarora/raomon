@@ -1,0 +1,776 @@
+#!/bin/ksh
+set -x
+####################################################################
+#  File Name         : raoramon.ksh
+#  Purpose           : Monitoring Oracle Databases with given sql & 
+#                    : related details
+#  Date Created      : Apr 21, 2006
+#  Author            : Rajesh Arora 
+#  Comments          : 
+####################################################################
+
+############## Following parameters should be changee to implement this script on a new server
+STRLIB=/opt/oracle/home/DBA/scripts/Lib/StrLib01.sh
+#. /opt/oracle/home/DBA/scripts/Lib/StrLib01.sh
+
+. $STRLIB
+PWORKDIR=/opt/oracle/home/DBA/scripts/raoraitor
+MONADMINP=rarora@8x8.com
+MONADMINE=rarora@8x8.com
+HARDEMAIL=ndrarora@yahoo.com
+ORAUSER="oracle"
+
+TMPDIR=/tmp/
+ORATAB=/var/opt/oracle/oratab
+ETCHOSTS=/etc/hosts
+UCBPS=/usr/ucb/ps
+HN="`hostname`"
+RAORACFG="configfiles/raoracfg."$HN""
+RAORASTOP="configfiles/raorastop."$HN""
+RAORAMAINT="configfiles/raoramaint."$HN
+RAORALOGDIR="log"
+RAORALOG="${RAORALOGDIR}/raoraitor.log"
+RAORASLA="${RAORALOGDIR}/raorasla."$HN""
+#########################################################################
+
+DBDOWN=""
+DBMAINT=""
+LSMAINT=""
+ASMAINT=""
+PSMAINT=""
+EMSENDST1="1000"
+EMSENDEN1="1015"
+EMSENDST="1300"
+EMSENDEN="1315"
+## EMSENDST and EMSENDEN is used to send one email per day in case
+## the monitoring is stopped by DBA
+ESENDEHST="00"
+ESENDEHEN="15"
+#ESENDEHST="00"
+#ESENDEHEN="59"
+## ESENDEHST -E-email, Send- sends EH- every hour ST - Start
+## Above two variables used to send an email per hour
+## or to perform the probe once per hour
+ESUBJ=""
+EMESS=""
+EMCAT=""
+EMSER=""
+EMSERNAM=""
+##### Variables for SLA reporting - shall be written into RAORASLA -- Start
+SLASERNAM="UNKNOWN"
+SLASER="XX"
+SLADATE="`date +%Y%m%d%H%M`"
+SLASTATUS="XX"
+
+#### Following variable defined for making script modular(multiple scripts - Start ##
+
+DBUPDNSCR=$PWORKDIR/ramdbupdn.ksh
+RALISTSCR=$PWORKDIR/ramlisupdn.ksh
+DBCACHESCR=$PWORKDIR/ramdbc.ksh
+DBPERSCR=$PWORKDIR/ramchkdbp.ksh
+PSNTSCR=$PWORKDIR/rampsntscr.ksh
+WSUPDNSCR=$PWORKDIR/ramwsupdn.ksh
+
+#### Following variable defined for making script modular(multiple scripts - End   ##
+
+
+
+##------------------- All Functions Start -----------------------##
+
+
+#### Function write_sla  -> Write on to RAORASLA file  -- Start ############
+write_sla()
+{
+#echo "${HN},${HOSTALIAS},${SLADATE},${SLASER},${SLASERNAM},${SLASTATUS}" >> $RAORASLA
+echo "${HN},${SLADATE},${SLASER},${SLASERNAM},${SLASTATUS}" >> $RAORASLA
+}
+#### Function write_sla  -> Write on to RAORASLA file  -- End   ############
+#echo "Func write_sla over"
+
+
+##### rm_file - Remove File ------------------------ Start #####
+rm_file()
+{
+   (( $# > 1 )) && return 1
+   [ -f "$1" -a -n "$1" ] && rm $1
+}
+##### rm_file - Remove File ------------------------ End   #####
+
+
+####### garbrem -- Garbage removal function ######## Start #######
+garbrem()
+{
+  FILENAME=raora_*
+  #rm $TMPDIR$FILENAME
+
+  #rm_file /usr/local/admin/raoraitor/raoraitor.tar.gz
+  #rm_file /usr/local/admin/raoraitor/raoraitor.ksh.save
+  #rm_file /usr/local/admin/raoraitor/raoraitor.ksh.ori
+  #rm_file /use/local/admin/raoraitor/README
+
+  #rm_file /tmp/raoraitor.log
+  #rm_file /tmp/raorasla*
+}
+
+####### garbrem -- Garbage removal function ######## End   #######
+
+#echo "function mklink over"
+
+### Function to check for maintenance stoppage(All)----- Start  ######
+maint_stopall()
+{
+if [  -r ${RAORAMAINT} ] 
+   then
+   # MAINTST -> Stop Monitoring Start Time
+   # MAINTEN -> Stop Monitoring End   Time
+   MAINTST=""
+   MAINTEN=""
+   egrep ^all $RAORAMAINT | while read LINE
+     do
+       MAINTST="`echo $LINE|cut -d\  -f4`"
+       MAINTEN="`echo $LINE|cut -d\  -f5`"
+       MAINTEVENT="`echo $LINE|cut -d\  -f3`"
+       MAINTREASON="`echo $LINE|cut -d:  -f2`."
+       if [ "${MAINTREASON}" = "" ] 
+          then
+            MAINTREASON="No Reason Mentioned by DBA"
+       fi 
+       if [ "$MAINTEVENT" = "all" ]
+          then
+            if [ `date +%Y%m%d%H%M` -ge $MAINTST ] &&
+               [ `date +%Y%m%d%H%M` -lt $MAINTEN ]
+               #[ `date +%Y%m%d%H%M` -le $MAINTEN ]
+               then
+                 EMESS="Monitoring(ALL) Paused from ${MAINTST} to ${MAINTEN} for ${MAINTREASON}"
+                 ESUBJ="Monitoring(ALL) Paused"
+                 EMCAT="OTH"
+                 EMSER=""
+                 EMSERNAM=""
+
+                 if [ `date +%H%M` -ge $EMSENDST ] &&
+                    [ `date +%H%M` -lt $EMSENDEN ]
+                    then
+                      #EMAILGRP=8
+                      EMAILGRP=0
+                      get_emailadd
+                      list_mail
+                    else
+                      echo "${EMESS} `date +%Y%m%d%H%M`" >> $RAORALOG 
+                 fi
+                 finish_now
+                 exit
+            fi
+       fi
+     done
+fi
+}
+#echo "function check maintenance stoppage over"
+
+
+### Function to check for maintenance stoppage(DB)----- Start  ######
+maint_stopdb()
+{
+if [  -r ${RAORAMAINT} ] 
+then
+# MAINTST -> Stop Monitoring Start Time
+# MAINTEN -> Stop Monitoring End   Time
+MAINTST=""
+MAINTEN=""
+egrep ^all $RAORAMAINT | while read LINE
+  do
+    MAINTST="`echo $LINE|cut -d\  -f4`"
+    MAINTEN="`echo $LINE|cut -d\  -f5`"
+    MAINTEVENT="`echo $LINE|cut -d\  -f3`"
+    MAINTREASON="`echo $LINE|cut -d:  -f2`"
+    if [ "${MAINTREASON}" = "" ] 
+       then
+         MAINTREASON="No Reason is Mentioned by DBA"
+    fi  
+    if [ "$MAINTEVENT" = "$DBNAME" ]
+       then
+         if [ `date +%Y%m%d%H%M` -ge $MAINTST ] &&
+            [ `date +%Y%m%d%H%M` -le $MAINTEN ]
+            then
+              EMESS="Monitoring(${DBNAME}) Paused from ${MAINTST} to ${MAINTEN} for ${MAINTREASON}"
+              ESUBJ="Monitoring(${DBNAME}) Paused"
+              EMCAT="OTH"
+              EMSER=""
+              EMSERNAM=""
+              DBDOWN="${DBDOWN}|${DBNAME}|"
+
+              SLASERNAM="$DBNAME"
+              SLASER="DB"
+              SLASTATUS="PAUSED"
+              if [ `date +%H%M` -ge $EMSENDST ] &&
+                 [ `date +%H%M` -lt $EMSENDEN ]
+                 then
+                   EMAILADD=""
+                   #EMAILGRP=8
+                   EMAILGRP=0
+                   get_emailadd
+                   list_mail
+                 else
+                   echo "${EMESS} `date +%Y%m%d%H%M`" >> $RAORALOG 
+              fi
+              #finish_now
+              #exit
+              write_sla
+         fi
+    fi
+  done
+fi
+}
+### Function to check for maintenance stoppage(DB)----- End    ######
+#echo "function check for maintenace stoppage over"
+
+#### Function get_emailadd - gets emailadd from emailstor -- Start ###
+get_emailadd()
+{
+  EMAILADD=""
+echo "Reached A1"
+  egrep ^emailgrp $EMAILSTOR | while read LINE
+  do
+    WEMAILGRP="`echo $LINE|cut -d\  -f2`"
+    WEMAILADD="`echo $LINE|cut -d\  -f3`"
+    if [ "$EMAILGRP" = "$WEMAILGRP" ]  
+      then
+        EMAILADD=${WEMAILADD}
+        break
+    fi
+  done
+  if [ "$EMAILADD" = "" ]
+     then 
+       EMAILADD=${MONADMINE}
+       EMESS="emailgroup "$EMAILGRP" missing in raoracfg"
+       ESUBJ="emailgroup missing"
+       list_mail
+  fi
+  echo "Reached A2"
+}
+#### Function get_emailadd - gets emailadd from emailstor -- End   ###
+#echo "function get_emailadd over"
+
+### Function finish_now -------------------------------------- Start #
+finish_now()
+{
+  process_emailf
+  echo "***** RAORAITOR Finished `date +%Y%m%d%H%M%S` *" >> $RAORALOG
+  garbrem
+}
+### Function finish_now -------------------------------------- End   #
+
+########### Function get_tempfile                    Start #####
+get_tempfile()
+{
+  #DDD=`date +%m%d%H%M%S`
+  RND1="$RANDOM"
+  RND2="$RANDOM"
+  CURRSESS="raora_$$"
+  #CURRSESS="raora_"
+  #TEMPFILE="$TMPDIR$CURRSESS$RNDM$DDD"
+  TEMPFILE="$TMPDIR$CURRSESS$RND1$RND2"
+  rm_file $TEMPFILE
+  echo " " > $TEMPFILE
+  chmod 777 $TEMPFILE   
+}
+########### Function get_tempfile                    End   #####
+
+# Function get_oraenv to get Oracle Home for given DB ## start ####
+get_oraenv()
+{
+  DBFOUND="N"
+  ORABIN=""
+  ORASID=""
+  egrep -i ":" ${ORATAB} | egrep -v ^# | while read LINE
+  do
+    ORASID0=`echo $LINE|cut -d: -f1`
+    DBNAMEUC=`echo $DBNAME | tr '[:lower:]' '[:upper:]'`
+    DBNAMELC=`echo $DBNAME | tr '[:upper:]' '[:lower:]'`
+    if [ "$ORASID0" = "$DBNAMEUC"  -o "$ORASID0" = "$DBNAMELC" ]  
+      then
+        ORAHOME=`echo $LINE|cut -d: -f2` 
+        ORASID=`echo $LINE|cut -d: -f1` 
+        ORABIN="${ORAHOME}/bin"
+        DBFOUND="Y"
+        break
+    fi
+  done
+#+++++++++++++++++++++++++++++
+  if [ "$DBFOUND" = "N" ]
+     then
+       egrep -i ":" ${ORATAB} | egrep ^# | while read LINE
+       do
+         ORASID0=`echo $LINE|cut -d: -f1`
+         DBNAMEUC1="#`echo $DBNAME | tr '[:lower:]' '[:upper:]'`"
+         DBNAMELC1="#`echo $DBNAME | tr '[:upper:]' '[:lower:]'`"
+         if [ "$ORASID0" = "$DBNAMEUC1"  -o "$ORASID0" = "$DBNAMELC1" ]  
+           then
+             ORAHOME=`echo $LINE|cut -d: -f2` 
+             ORASID=`echo $LINE|cut -d: -f1|cut -c2-10` 
+             ORABIN="${ORAHOME}/bin"
+             DBFOUND="Y"
+             break
+         fi
+       done
+  fi
+#+++++++++++++++++++++++++++++
+  if [ "$DBFOUND" = "N" ]
+     then
+       DBDOWN="${DBDOWN}|${DBNAME}|"
+       EMESS="DB ${DBNAME} missing in oratab.";
+       ESUBJ="DB missing in oratab"
+       EMCAT="OTH"
+       EMSER=""
+       EMSERNAM=""
+       if [ `date +%M` -ge $ESENDEHST ] &&
+          [ `date +%M` -lt $ESENDEHEN ] 
+          then
+            EMAILADD="${MONADMINP}"
+            list_mail
+       fi
+  fi
+}
+# Function get_oraenv to get Oracle Home for given DB ## end   ####
+
+
+
+
+#### Function list_mail accumulates email in temp file(NEW)  # Start ##
+list_mail()   
+{
+    ## Currently there is a limit to number of email address for a single
+    ## event which can be defined in raoraitor.data file
+
+
+    EMAIL1=""
+    EMAIL2=""
+    EMAIL3=""
+
+    CHKMULTI=""
+    CHKMULTI="`echo "$EMAILADD"|grep ,`"
+
+    if [ "$CHKMULTI" != "" ] 
+      then
+        EMAIL1=`echo $EMAILADD|cut -d, -f1`
+        EMAIL2=`echo $EMAILADD|cut -d, -f2`
+        EMAIL3=`echo $EMAILADD|cut -d, -f3`
+      else
+        EMAIL1=`echo $EMAILADD|cut -d, -f1`
+        EMAIL2=""
+        EMAIL3=""
+    fi 
+
+    if [ "$EMAIL1" != "" ] 
+       then
+         echo "mail:${EMAIL1}:${EMCAT}:${EMSER}:${EMSERNAM}:${EMESS}:${ESUBJ}" >> $TEMPMAIL1;
+    fi
+    if [ "$EMAIL2" != "" ] 
+       then
+         echo "mail:${EMAIL2}:${EMCAT}:${EMSER}:${EMSERNAM}:${EMESS}:${ESUBJ}" >> $TEMPMAIL1;
+    fi
+    if [ "$EMAIL3" != "" ] 
+       then
+         echo "mail:${EMAIL3}:${EMCAT}:${EMSER}:${EMSERNAM}:${EMESS}:${ESUBJ}" >> $TEMPMAIL1;
+    fi
+}
+#### Function list_mail accumulates email in temp file(NEW)  # End   ##
+
+
+# Function process_emailf(new) - To process email temp file -- Start #
+process_emailf()
+{
+  #sort -t : -k 2,2 $TEMPMAIL1 > $TEMPMAIL2
+  sort -t: $TEMPMAIL1 > $TEMPMAIL2
+  #echo "Email File Used is "$TEMPMAIL2""  >> $RAORALOG;
+  FSTART="Y"
+  PEMAIL=""
+  GRANDMESS=""
+  GRANDSUB=""
+  ESERLIST=""
+
+  egrep -i "^mail" ${TEMPMAIL2} | while read LINE
+  do
+    FEMAIL=`echo $LINE|cut -d: -f2`
+    FCAT=`echo $LINE|cut -d: -f3`
+    FSER=`echo $LINE|cut -d: -f4`
+    FSERN=`echo $LINE|cut -d: -f5`
+    FMESS=`echo $LINE|cut -d: -f6`
+    FSUBJ=`echo $LINE|cut -d: -f7`
+    if [ "$FSTART" = "Y" ] 
+       then
+          PEMAIL="${FEMAIL}"
+          PCAT="${FCAT}"
+          PSER="${FSER}"
+          #PSERN="${FSERN}"
+          FSTART="N"
+    fi
+    if [ "${PEMAIL}" != "${FEMAIL}" ]
+       then
+         if [ "${PCAT}" = "SER" ]
+            then
+              if [ "$PSER" != "" ]
+                 then 
+                   ESUBJECT="${PSER} DN."
+                   EMESSAGE="${PSER} DN(${ESERLIST})."  
+              fi
+              ESERSUBJECT="${ESERSUBJECT} ${ESUBJECT}"
+              ESERMESSAGE="${ESERMESSAGE} ${EMESSAGE}"
+         fi
+#        if [ "${PCAT}" = "OTH" ]
+#           then 
+#             EOTHSUBJECT="${EOTHSUBJECT} ${ESUBJECT}"
+#             EOTHMESSAGE="${EOTHMESSAGE} ${EMESSAGE}"
+#        fi
+         #EOTHSUBJECT="${EOTHSUBJECT} ${FSUBJ}"
+         #EOTHMESSAGE="${EOTHMESSAGE} ${FMESS}"
+         GRANDMESS="${GRANDMESS}${ESERMESSAGE}${EOTHMESSAGE}"       
+#        GRANDMESS="${HOSTALIAS}->${GRANDMESS}${ESERMESSAGE}${EOTHMESSAGE}"       
+         GRANDSUBJ="${GRANDSUBJ}${ESERSUBJECT}${EOTHSUBJECT}"       
+#        GRANDSUBJ="${HOSTALIAS}->${GRANDSUBJ}${ESERSUBJECT}${EOTHSUBJECT}"       
+         #GRANDMESS="${GRANDMESS} ${ESERMESSAGE}"       
+         #GRANDSUBJ="${GRANDSUBJ} ${ESERSUBJECT}"       
+
+         email_grand
+#        echo "1->${GRANDSUBJ}:${GRANDMESS}:${PEMAIL}"
+         GRANDMESS=""
+         GRANDSUBJ=""
+         ESERMESSAGE=""
+         ESERSUBJECT=""
+         EOTHMESSAGE=""
+         EOTHSUBJECT=""
+         ESUBJECT=""
+         EMESSAGE=""
+         PEMAIL="${FEMAIL}"
+         #PCAT="${FCAT}"
+         PSER="${FSER}"
+         #PSERN="${FSERN}"
+         ESERLIST=""
+    fi
+
+    if [ "${FCAT}" = "OTH" ]
+       then
+         EOTHSUBJECT="${EOTHSUBJECT} ${FSUBJ}"
+         EOTHMESSAGE="${EOTHMESSAGE} ${FMESS}"
+    fi
+
+    if [ "${FCAT}" = "SER" ]
+       then
+         if [ "${FSER}" != "${PSER}" ]
+            then
+              if [ "$PSER" != "" ]
+                 then
+                   ESUBJECT="${PSER} DN."
+                   EMESSAGE="${PSER} DN(${ESERLIST})."  
+              fi
+                   ESERSUBJECT="${ESERSUBJECT} ${ESUBJECT}"
+                   ESERMESSAGE="${ESERMESSAGE} ${EMESSAGE}"
+              ESERLIST=""
+              ESUBJECT=""
+              EMESSAGE=""
+              PSER="${FSER}"
+         fi
+         ESERLIST="${ESERLIST}${FSERN},"
+         PCAT="${FCAT}"
+    fi
+done
+
+GRANDMESS="${GRANDMESS}${ESERMESSAGE}${EOTHMESSAGE}"       
+GRANDSUBJ="${GRANDSUBJ}${ESERSUBJECT}${EOTHSUBJECT}"       
+email_grand
+GRANDMESS=""
+GRANDSUBJ=""
+}
+# Function process_emailf(new) - To process email temp file -- End   #
+
+
+##### Function email_grand - to email the accumulated messages - Start #
+email_grand()
+{
+
+#### Logger -> to write info to syslog and from syslog the email shall be
+####           sent using wots
+
+if [ "$GRANDMESS" != "" ]
+   then
+    if [ "$PEMAIL" != "" ]
+     then
+       #GRANDMESS="${HOSTALIAS}.${HN}->${GRANDMESS} `date +%Y%m%d%H%M`"
+       #GRANDSUBJ="${HOSTALIAS}.${HN}->${GRANDSUBJ}"
+       GRANDMESS="${HN}->${GRANDMESS} `date +%Y%m%d%H%M`"
+       GRANDSUBJ="${HN}->${GRANDSUBJ}"
+       echo "Email "$PEMAIL"|"$GRANDMESS""  >> $RAORALOG;
+       echo $GRANDMESS | mailx -s "$GRANDSUBJ" "$FEMAIL"
+       #logger -p local0.err "RAORAITOR:${GRANDSUBJ}:${GRANDMESS}:${PEMAIL}";
+    fi
+fi
+}
+##### Function email_grand - to email the accumulated messages - End   #
+
+
+##------------------- All Functions End   -----------------------##
+
+############# The Program ############################# Start #########
+cd ${PWORKDIR}
+get_tempfile
+TEMPMAIL1="$TEMPFILE"
+
+get_tempfile
+PSFILE="$TEMPFILE"
+ps -ef > $PSFILE
+
+######### Temporary Email File Creation  -------------  End   #########
+
+
+##### -- Defining variables(2) ----------------------- Start ########
+IPADD="`grep -i "$HN" ${ETCHOSTS} | awk '{print $1}'`"
+
+##### -- Defining variables(2) ----------------------- End   ########
+
+# Checking for existance/permission of Configuration Files -- Start #
+if [ -x ${RAORALOGDIR} ] && [ -w ${RAORALOGDIR} ]  
+   then
+     continue
+   else
+     #ESUBJ="Can not write on ${RAORALOG} on ${HOSTALIAS}, instead shall write to \/tmp."
+     EMESS="Cannot write on ${RAORALOGDIR}, instead shall write to \/tmp."
+     ESUBJ="Cannot write on ${RAORALOGDIR}"
+     EMCAT="OTH"
+     EMSER=""
+     EMSERNAM=""
+     EMAILADD="$MONADMINP"
+     list_mail
+     RAORALOGDIR="/tmp"
+     RAORALOG="${RAORALOGDIR}/raoraitor.log"
+     #finish_now
+     #exit
+fi
+if [ -x ${TMPDIR} ] && [ -w ${TMPDIR} ]  
+   then
+     continue
+   else
+     EMESS="Cannot write on ${TMPDIR}, Exiting."
+     ESUBJ="Cannot write on ${TMPDIR}"
+     EMCAT="OTH"
+     EMSER=""
+     EMSERNAM=""
+     EMAILADD="$MONADMINP"
+     list_mail
+     finish_now
+     exit
+fi
+if [ ! -r ${RAORACFG} ] 
+   then
+     #ESUBJ="File ${RAORACFG} not found on ${HOSTALIAS}."
+     EMESS="File ${RAORACFG} missing"
+     ESUBJ="${RAORACFG} missing"
+     EMCAT="OTH"
+     EMSER=""
+     EMSERNAM=""
+     EMAILADD="$MONADMINP"
+     if [ `date +%M` -ge $ESENDEHST ] &&
+        [ `date +%M` -lt $ESENDEHEN ]          
+        then
+           list_mail
+        else
+           echo "$EMESS" >> $RAORALOG;
+     fi
+     finish_now
+     exit
+fi
+if [ ! -r ${RAORASTOP} ] 
+   then
+     #ESUBJ="File ${RAORASTOP} not found on ${HOSTALIAS}."
+     EMESS="File ${RAORASTOP} missing"
+     ESUBJ="${RAORASTOP} missing"
+     EMCAT="OTH"
+     EMSER=""
+     EMSERNAM=""
+     EMAILADD="$MONADMINP"
+     if [ `date +%M` -ge $ESENDEHST ] &&
+        [ `date +%M` -lt $ESENDEHEN ]          
+        then
+          list_mail
+     fi
+     #finish_now
+     #exit
+fi
+
+
+
+## Write Permission is required for this directory to write logs
+
+
+# Checking for existance/permission of Configuration Files -- End   #
+
+
+
+### Checking for the correct data file on this unix host ## Start
+RAXHOST="`egrep -i ^unixhost ${RAORACFG} | awk '{print $2}'`"
+if  [ "${RAXHOST}" != `hostname` ]
+   then
+     EMESS="Wrong CFG `hostname`/$RAXHOST."
+     ESUBJ="Wrong CFG file"
+     EMCAT="OTH"
+     EMSER=""
+     EMSERNAM=""
+     EMAILADD="${MONADMINP}"
+     if [ `date +%M` -ge $ESENDEHST ] &&
+        [ `date +%M` -lt $ESENDEHEN ]          
+        then
+          list_mail
+     fi
+     echo "$EMESS" >> $RAORALOG;
+     finish_now
+     exit
+fi
+# Now setting RAXHOST to the third field from /etc/hosts because
+# HOSTALIAS is being used in whole program to send email
+
+
+### Checking for the correct data file on this unix host ## End  
+
+echo "****** RAORAITOR Started `date +%Y%m%d%H%M%S` *" >> $RAORALOG
+
+#  Sets the monitoring data and log variables
+
+###### Stop Monitoring for the given Day of the Week --- Start ####
+#### Stop Monitoring for the time given in the RAORACFG file -- Start
+## DAYWEEKST -> Day of week - Stop Monitoring Start Time
+## DAYWEEKET -> Day of week - Stop Monitoring End   Time
+## DAYWEEK   -> Day of week
+
+if [ -r "$RAORASTOP" ]
+   then
+   SFDEXIST=`egrep -i "^StopforDay" ${RAORASTOP}`
+   if [ $? = 0 ]
+      then
+         egrep -i "^StopforDay" ${RAORASTOP} | while read LINE
+         do
+            DAYWEEK=`echo ${LINE} | awk '{print $2}'`
+            DAYWEEKST=`echo ${LINE} | awk '{print $3}'`
+            DAYWEEKET=`echo ${LINE} | awk '{print $4}'`
+
+            if [ `date +%a` = "$DAYWEEK" ] && 
+               [ `date +%H%M` -ge "$DAYWEEKST" ]  &&
+               [ `date +%H%M` -le "$DAYWEEKET" ] 
+               then
+                  SLASERNAM="SERVER"
+                  SLASER="SR"
+                  SLASTATUS="BACKUP WINDOW"
+                  write_sla
+                  EMESS="Monitoring stopped on $DAYWEEK between $DAYWEEKST and $DAYWEEKET";
+                  echo "$EMESS" >> $RAORALOG;
+                  finish_now
+                  exit
+               #else
+               #  echo "No"
+            fi
+         done
+   fi
+#else
+#   ESUBJ="raorastop file does not exist on ${HOSTALIAS}.";
+#   EMESS="${ESUBJ}"
+#   EMAILADD="${MONADMINP}"
+#   list_mail
+fi
+###### Stop Monitoring for the given Day of the Week --- End   ####
+
+#  Checks for the existance of the monitoring data file
+if [ ! -r ${RAORACFG} ]
+then
+   echo "${RAORACFG} not readable - exiting... " >> $RAORALOG
+#   FILE_NAME=$ORACLE_BASE/local/log/space_mon.log
+       EMESS="${RAORACFG} missing"
+       ESUBJ="${RAORACFG} missing"
+       EMCAT="OTH"
+       EMSER=""
+       EMSERNAM=""
+       EMAILADD=${MONADMINP}     
+       list_mail
+       finish_now
+       exit;
+fi
+
+### Checking for the correct alias from ETCHOSTS ## Start
+
+### Checking for the correct alias from ETCHOSTS ## End  
+
+
+###### Creating temporary file for email storage from raoracfg - Start ###
+
+get_tempfile
+EMAILSTOR="$TEMPFILE"
+egrep ^emailgrp $RAORACFG > $EMAILSTOR
+###### Creating temporary file for email storage from raoracfg - End   ###
+
+## Send an email per week - what is being monitored to Primary DBA -- Start #
+### BM variables means Being Monitored
+if [ `date +%H%M` -ge $EMSENDST1 ] &&
+   [ `date +%H%M` -lt $EMSENDEN1 ] &&
+   [ "`date +%A|cut -c 1-3`" = "Tue" ]
+    then
+       EMAILGRP=0
+       get_emailadd
+       BM="DB("
+       egrep -i ^database ${RAORACFG} | while read LINE
+       do
+         DBNAME=`echo ${LINE} | awk '{print $3}'`
+         ORAUSER=`echo ${LINE} | awk '{print $5}'`
+         BM=""$BM""$DBNAME","
+       done
+       BM=""$BM") LN("
+       egrep -i ^listener ${RAORACFG} | while read LINE
+       do
+         LISTNAME=`echo ${LINE} | awk '{print $2}'`
+         DBNAME=`echo ${LINE} | awk '{print $4}'`
+         ORAUSER=`echo ${LINE} | awk '{print $6}'`
+         BM=""$BM""$LISTNAME"("$DBNAME"),"
+       done
+       BM=""$BM") PS("
+       egrep -i ^procsch ${RAORACFG} | while read LINE
+       do
+         PRCSNAME=`echo ${LINE} | awk '{print $3}'`
+         BM=""$BM""$PRCSNAME","
+       done
+       BM=""$BM") AS("
+       egrep -i ^appserver ${RAORACFG} | while read LINE
+       do
+         APPSNAME=`echo ${LINE} | awk '{print $3}'`
+         BM=""$BM""$APPSNAME","
+       done
+       BM=""$BM")"
+       ESUBJ="Services currently monitored by RAORAITOR."
+       ESUBJ="Services currently monitored by RAORAITOR, for this customer."
+       EMESS=""$BM". Also refer Monitoring paused email"
+       EMCAT="OTH"
+       EMSER=""
+       EMSERNAM=""
+       list_mail
+fi
+echo "Reached B2"
+## Send an email per week - what is being monitored to Primary DBA -- End   #
+
+### Checking for the Stoppage for maintenance  -------- Start ####
+maint_stopall
+### Checking for the Stoppage for maintenance  -------- End   ####
+
+##### Main Logic Starts here ###################################3
+egrep -i ^listener ${RAORACFG} | while read LINE
+do
+  LISTNAME=`echo ${LINE} | awk '{print $2}'`
+  EVENTYPE=`echo ${LINE} | awk '{print $3}'`
+  DBNAME=`echo ${LINE} | awk '{print $4}'`
+  #EMAILADD=`echo ${LINE} | awk '{print $5}'`
+  EMAILGRP="`echo ${LINE} | awk '{print $5}'`"
+  ORAUSER=`echo ${LINE} | awk '{print $6}'`
+
+  get_emailadd
+  get_oraenv
+  ORABIN="${ORAHOME}/bin"
+  LSNREXE="${ORAHOME}/bin/lsnrctl"
+  ORASID=${DBNAME}
+done
+#### Checking Service - Listener ######## End   ####
+finish_now
+exit
+

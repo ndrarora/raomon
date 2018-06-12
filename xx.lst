@@ -1,0 +1,99 @@
+
+      DBID NAME      CREATED   RESETLOGS_CHANGE# RESETLOGS                      
+---------- --------- --------- ----------------- ---------                      
+PRIOR_RESETLOGS_CHANGE# PRIOR_RES LOG_MODE     CHECKPOINT_CHANGE#               
+----------------------- --------- ------------ ------------------               
+ARCHIVE_CHANGE# CONTROL CONTROLFI CONTROLFILE_SEQUENCE# CONTROLFILE_CHANGE#     
+--------------- ------- --------- --------------------- -------------------     
+CONTROLFI OPEN_RESETL VERSION_T OPEN_MODE  PROTECTION_MODE                      
+--------- ----------- --------- ---------- --------------------                 
+PROTECTION_LEVEL     REMOTE_A ACTIVATION# DATABASE_ROLE    ARCHIVELOG_CHANGE#   
+-------------------- -------- ----------- ---------------- ------------------   
+SWITCHOVER_STATUS  DATAGUAR GUARD_S SUP SUP SUP FOR                             
+------------------ -------- ------- --- --- --- ---                             
+3726684221 CRMPROD   30-APR-05                 1 30-APR-05                      
+
+      DBID NAME      CREATED   RESETLOGS_CHANGE# RESETLOGS                      
+---------- --------- --------- ----------------- ---------                      
+PRIOR_RESETLOGS_CHANGE# PRIOR_RES LOG_MODE     CHECKPOINT_CHANGE#               
+----------------------- --------- ------------ ------------------               
+ARCHIVE_CHANGE# CONTROL CONTROLFI CONTROLFILE_SEQUENCE# CONTROLFILE_CHANGE#     
+--------------- ------- --------- --------------------- -------------------     
+CONTROLFI OPEN_RESETL VERSION_T OPEN_MODE  PROTECTION_MODE                      
+--------- ----------- --------- ---------- --------------------                 
+PROTECTION_LEVEL     REMOTE_A ACTIVATION# DATABASE_ROLE    ARCHIVELOG_CHANGE#   
+-------------------- -------- ----------- ---------------- ------------------   
+SWITCHOVER_STATUS  DATAGUAR GUARD_S SUP SUP SUP FOR                             
+------------------ -------- ------- --- --- --- ---                             
+                      0           ARCHIVELOG           3152103148               
+
+      DBID NAME      CREATED   RESETLOGS_CHANGE# RESETLOGS                      
+---------- --------- --------- ----------------- ---------                      
+PRIOR_RESETLOGS_CHANGE# PRIOR_RES LOG_MODE     CHECKPOINT_CHANGE#               
+----------------------- --------- ------------ ------------------               
+ARCHIVE_CHANGE# CONTROL CONTROLFI CONTROLFILE_SEQUENCE# CONTROLFILE_CHANGE#     
+--------------- ------- --------- --------------------- -------------------     
+CONTROLFI OPEN_RESETL VERSION_T OPEN_MODE  PROTECTION_MODE                      
+--------- ----------- --------- ---------- --------------------                 
+PROTECTION_LEVEL     REMOTE_A ACTIVATION# DATABASE_ROLE    ARCHIVELOG_CHANGE#   
+-------------------- -------- ----------- ---------------- ------------------   
+SWITCHOVER_STATUS  DATAGUAR GUARD_S SUP SUP SUP FOR                             
+------------------ -------- ------- --- --- --- ---                             
+     3152067289 CURRENT 30-APR-05                203961          3152190013     
+
+      DBID NAME      CREATED   RESETLOGS_CHANGE# RESETLOGS                      
+---------- --------- --------- ----------------- ---------                      
+PRIOR_RESETLOGS_CHANGE# PRIOR_RES LOG_MODE     CHECKPOINT_CHANGE#               
+----------------------- --------- ------------ ------------------               
+ARCHIVE_CHANGE# CONTROL CONTROLFI CONTROLFILE_SEQUENCE# CONTROLFILE_CHANGE#     
+--------------- ------- --------- --------------------- -------------------     
+CONTROLFI OPEN_RESETL VERSION_T OPEN_MODE  PROTECTION_MODE                      
+--------- ----------- --------- ---------- --------------------                 
+PROTECTION_LEVEL     REMOTE_A ACTIVATION# DATABASE_ROLE    ARCHIVELOG_CHANGE#   
+-------------------- -------- ----------- ---------------- ------------------   
+SWITCHOVER_STATUS  DATAGUAR GUARD_S SUP SUP SUP FOR                             
+------------------ -------- ------- --- --- --- ---                             
+04-AUG-06 NOT ALLOWED 30-APR-05 READ WRITE MAXIMUM PERFORMANCE                  
+
+      DBID NAME      CREATED   RESETLOGS_CHANGE# RESETLOGS                      
+---------- --------- --------- ----------------- ---------                      
+PRIOR_RESETLOGS_CHANGE# PRIOR_RES LOG_MODE     CHECKPOINT_CHANGE#               
+----------------------- --------- ------------ ------------------               
+ARCHIVE_CHANGE# CONTROL CONTROLFI CONTROLFILE_SEQUENCE# CONTROLFILE_CHANGE#     
+--------------- ------- --------- --------------------- -------------------     
+CONTROLFI OPEN_RESETL VERSION_T OPEN_MODE  PROTECTION_MODE                      
+--------- ----------- --------- ---------- --------------------                 
+PROTECTION_LEVEL     REMOTE_A ACTIVATION# DATABASE_ROLE    ARCHIVELOG_CHANGE#   
+-------------------- -------- ----------- ---------------- ------------------   
+SWITCHOVER_STATUS  DATAGUAR GUARD_S SUP SUP SUP FOR                             
+------------------ -------- ------- --- --- --- ---                             
+MAXIMUM PERFORMANCE  ENABLED   3726711613 PRIMARY                  3152189909   
+
+      DBID NAME      CREATED   RESETLOGS_CHANGE# RESETLOGS                      
+---------- --------- --------- ----------------- ---------                      
+PRIOR_RESETLOGS_CHANGE# PRIOR_RES LOG_MODE     CHECKPOINT_CHANGE#               
+----------------------- --------- ------------ ------------------               
+ARCHIVE_CHANGE# CONTROL CONTROLFI CONTROLFILE_SEQUENCE# CONTROLFILE_CHANGE#     
+--------------- ------- --------- --------------------- -------------------     
+CONTROLFI OPEN_RESETL VERSION_T OPEN_MODE  PROTECTION_MODE                      
+--------- ----------- --------- ---------- --------------------                 
+PROTECTION_LEVEL     REMOTE_A ACTIVATION# DATABASE_ROLE    ARCHIVELOG_CHANGE#   
+-------------------- -------- ----------- ---------------- ------------------   
+SWITCHOVER_STATUS  DATAGUAR GUARD_S SUP SUP SUP FOR                             
+------------------ -------- ------- --- --- --- ---                             
+SESSIONS ACTIVE    DISABLED NONE    NO  NO  NO  NO                              
+
+      DBID NAME      CREATED   RESETLOGS_CHANGE# RESETLOGS                      
+---------- --------- --------- ----------------- ---------                      
+PRIOR_RESETLOGS_CHANGE# PRIOR_RES LOG_MODE     CHECKPOINT_CHANGE#               
+----------------------- --------- ------------ ------------------               
+ARCHIVE_CHANGE# CONTROL CONTROLFI CONTROLFILE_SEQUENCE# CONTROLFILE_CHANGE#     
+--------------- ------- --------- --------------------- -------------------     
+CONTROLFI OPEN_RESETL VERSION_T OPEN_MODE  PROTECTION_MODE                      
+--------- ----------- --------- ---------- --------------------                 
+PROTECTION_LEVEL     REMOTE_A ACTIVATION# DATABASE_ROLE    ARCHIVELOG_CHANGE#   
+-------------------- -------- ----------- ---------------- ------------------   
+SWITCHOVER_STATUS  DATAGUAR GUARD_S SUP SUP SUP FOR                             
+------------------ -------- ------- --- --- --- ---                             
+                                                                                
+

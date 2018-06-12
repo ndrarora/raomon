@@ -1,0 +1,21 @@
+#!/bin/ksh
+#set -x
+#test1()
+#{
+#sqlplus -s '/nolog' << EOF
+#connect sysadm/crmuat@"(DESCRIPTION= (ADDRESS= (PROTOCOL=TCP) (HOST=p8crm-dev) (PORT=1532))(CONNECT_DATA= (SID=CRMUAT)))"
+#select name into :XX from v\$database;
+#exit;
+#EOF
+#}
+test1()
+{
+sqlplus -s sysadm/crmuat@"(DESCRIPTION= (ADDRESS= (PROTOCOL=TCP) (HOST=p8crm-dev) (PORT=1532))(CONNECT_DATA= (SID=CRMUAT)))" << EOF
+set head off;
+select name into :XX from v\$database;
+exit;
+EOF
+}
+XX=""
+XX=`test1`
+echo "Found xxxxx  $XX"
